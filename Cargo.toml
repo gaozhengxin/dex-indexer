@@ -1,0 +1,39 @@
+[package]
+name = "dex-indexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Core framework dependencies
+sui-indexer-alt-framework = { git = "https://github.com/MystenLabs/sui.git", branch = "testnet" }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Diesel PostgreSQL
+diesel = { version = "2.0", features = ["postgres", "r2d2", "chrono"] }
+diesel-async = { version = "0.5", features = [
+    "bb8",
+    "postgres",
+    "async-connection-wrapper",
+] }
+diesel_migrations = "2.0"
+
+# Async traits
+async-trait = "0.1"
+
+# URL parsing
+url = "2.0"
+
+# Use .env file
+dotenvy = "0.15"
+
+# Command line parsing
+clap = { version = "4.0", features = ["derive"] }
+sui_types = "0.0.1"
+serde = { version = "1.0", features = ["derive"] }
+bcs = "0.1.6"
+rust_decimal = { version = "1.39", features = ["db-diesel-postgres"] }
