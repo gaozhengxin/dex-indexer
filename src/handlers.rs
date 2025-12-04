@@ -60,6 +60,10 @@ impl Processor for TransactionDigestHandler {
                         tx_digest: tx_digest_value.clone(),
                         event_id: index as i64,
                         pool: res.pool.to_string(),
+                        amount_a_in: if res.atob { Decimal::from(res.amount_in) } else { Decimal::from(0) },
+                        amount_a_out: if res.atob { Decimal::from(0) } else { Decimal::from(res.amount_out) },
+                        amount_b_in: if res.atob { Decimal::from(0) } else { Decimal::from(res.amount_in) },
+                        amount_b_out: if res.atob { Decimal::from(res.amount_out) } else { Decimal::from(0) },
                         fee_amount_a: if res.atob { Decimal::from(res.fee_amount) } else { Decimal::from(0) },
                         fee_amount_b: if res.atob { Decimal::from(0) } else { Decimal::from(res.fee_amount) },
                         timestamp: block_timestamp as i64
