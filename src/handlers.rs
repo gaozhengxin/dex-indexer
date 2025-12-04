@@ -8,6 +8,8 @@ use crate::models::StoredCetusSwap;
 use crate::schema::cetus_swap::dsl::*;
 use crate::sui_types::deserialize_swap_result;
 
+use chrono::{DateTime, Utc};
+
 use diesel_async::RunQueryDsl;
 use sui_indexer_alt_framework::{
     postgres::{Connection, Db},
@@ -72,9 +74,12 @@ impl Processor for TransactionDigestHandler {
             .collect::<Vec<StoredCetusSwap>>()
         }).collect::<Vec<_>>();
 
+        let block_date: DateTime<Utc> = checkpoint.summary.timestamp().into();
+
         let message = format!(
-            "process checkpoint: {} | cetus swap events: {}",
+            "process checkpoint: {} | time: {} | cetus swap events: {}",
             checkpoint_seq,
+            block_date.format("%Y-%m-%d %H:%M:%S UTC"),
             events.len()
         );
         print!("\r {}", message);
@@ -83,7 +88,7 @@ impl Processor for TransactionDigestHandler {
     }
     
     #[doc = " How much concurrency to use when processing checkpoint data."]
-    const FANOUT:usize = 10;
+    const FANOUT:usize = 20;
 }
 
 #[async_trait::async_trait]
