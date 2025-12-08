@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "install": "pnpm run build",
-    "preinstall": "pnpm some-script",
     "build": "tsc",
     "start": "pnpm build && node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
