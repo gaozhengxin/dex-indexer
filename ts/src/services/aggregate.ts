@@ -2,6 +2,7 @@
 import { PgClient } from '../pg/pg.client';
 import { SuiRpcClient } from '../sui/sui.client';
 import { HistoricalPriceGetter } from '../redis/redis.client';
+import Decimal from 'decimal.js';
 
 export interface PoolTypeEntry {
     pool: string;
@@ -66,12 +67,26 @@ export function createAggregateService(
         amountBOut: number,
         ts: number
     ): Promise<number> {
+        // 获取价格
         const priceA = await getNearestPrice(poolTypes.typeA, ts);
         const priceB = await getNearestPrice(poolTypes.typeB, ts);
-        const inValue = (priceA ? priceA * amountAIn : 0) + (priceB ? priceB * amountBIn : 0);
-        const outValue = (priceA ? priceA * amountAOut : 0) + (priceB ? priceB * amountBOut : 0);
-        return inValue > 0 ? inValue : outValue;
+
+        const decimalsA = priceGetter.getCoinDecimals
+            ? await priceGetter.getCoinDecimals(poolTypes.typeA)
+            : 0;
+        const decimalsB = priceGetter.getCoinDecimals
+            ? await priceGetter.getCoinDecimals(poolTypes.typeB)
+            : 0;
+
+        const inValue = new Decimal(priceA!).mul(amountAIn).div(new Decimal(10).pow(decimalsA!))
+            .add(new Decimal(priceB!).mul(amountBIn).div(new Decimal(10).pow(decimalsB!)));
+
+        const outValue = new Decimal(priceA!).mul(amountAOut).div(new Decimal(10).pow(decimalsA!))
+            .add(new Decimal(priceB!).mul(amountBOut).div(new Decimal(10).pow(decimalsB!)));
+
+        return inValue.gt(0) ? inValue.toNumber() : outValue.toNumber();
     }
+
 
     return {
         async runDailyAggregationJob(): Promise<AggregateResult> {
@@ -135,37 +150,41 @@ export function createAggregateService(
                     }>();
 
                     for (const row of swaps) {
-                        const poolId = row.pool;
-                        const poolInfo = poolTypeMap.get(poolId);
-                        if (!poolInfo) continue;
+                        try {
+                            const poolId = row.pool;
+                            const poolInfo = poolTypeMap.get(poolId);
+                            if (!poolInfo) continue;
 
-                        const amountAIn = Number(row.amount_a_in) || 0;
-                        const amountBIn = Number(row.amount_b_in) || 0;
-                        const amountAOut = Number(row.amount_a_out) || 0;
-                        const amountBOut = Number(row.amount_b_out) || 0;
-                        const feeA = Number(row.fee_amount_a) || 0;
-                        const feeB = Number(row.fee_amount_b) || 0;
-                        const ts = Number(row.timestamp);
+                            const amountAIn = Number(row.amount_a_in) || 0;
+                            const amountBIn = Number(row.amount_b_in) || 0;
+                            const amountAOut = Number(row.amount_a_out) || 0;
+                            const amountBOut = Number(row.amount_b_out) || 0;
+                            const feeA = Number(row.fee_amount_a) || 0;
+                            const feeB = Number(row.fee_amount_b) || 0;
+                            const ts = Number(row.timestamp);
 
-                        const usdValue = await computeUsdValueForSwap(poolInfo, amountAIn, amountBIn, amountAOut, amountBOut, ts);
+                            const usdValue = await computeUsdValueForSwap(poolInfo, amountAIn, amountBIn, amountAOut, amountBOut, ts);
 
-                        const prev = batchAgg.get(poolId) || {
-                            totalAIn: 0, totalAOut: 0,
-                            totalBIn: 0, totalBOut: 0,
-                            totalUsd: 0, swapCount: 0,
-                            totalFeeA: 0, totalFeeB: 0
-                        };
+                            const prev = batchAgg.get(poolId) || {
+                                totalAIn: 0, totalAOut: 0,
+                                totalBIn: 0, totalBOut: 0,
+                                totalUsd: 0, swapCount: 0,
+                                totalFeeA: 0, totalFeeB: 0
+                            };
 
-                        prev.totalAIn += amountAIn;
-                        prev.totalAOut += amountAOut;
-                        prev.totalBIn += amountBIn;
-                        prev.totalBOut += amountBOut;
-                        prev.totalUsd += usdValue;
-                        prev.swapCount += 1;
-                        prev.totalFeeA += feeA;
-                        prev.totalFeeB += feeB;
+                            prev.totalAIn += amountAIn;
+                            prev.totalAOut += amountAOut;
+                            prev.totalBIn += amountBIn;
+                            prev.totalBOut += amountBOut;
+                            prev.totalUsd += usdValue;
+                            prev.swapCount += 1;
+                            prev.totalFeeA += feeA;
+                            prev.totalFeeB += feeB;
 
-                        batchAgg.set(poolId, prev);
+                            batchAgg.set(poolId, prev);
+                        } catch (e) {
+                            //
+                        }
                     }
 
                     for (const [poolId, v] of batchAgg.entries()) {

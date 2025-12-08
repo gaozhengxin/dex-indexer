@@ -2,6 +2,7 @@ import { createClient, RedisClientType } from 'redis';
 
 export interface HistoricalPriceGetter {
     getHistoricalPrice: (tokenType: string, timestampSeconds: number) => Promise<string | null>;
+    getCoinDecimals: (coinId: string) => Promise<number | null>;
 }
 
 let globalRedisClient: RedisClientType | null = null;
@@ -30,6 +31,18 @@ export function createRedisClient(connectionString: string): HistoricalPriceGett
                 return await globalRedisClient!.get(key);
             } catch (err) {
                 console.error(`❌ [Redis Client] Failed to get price for key ${key}:`, (err as Error).message);
+                return null;
+            }
+        },
+        getCoinDecimals: async (coinId: string): Promise<number | null> => {
+            const key = `coin:${coinId}`;
+            try {
+                const jsonStr = await globalRedisClient!.get(key);
+                if (!jsonStr) return null;
+                const obj = JSON.parse(jsonStr);
+                return typeof obj.decimals === 'number' ? obj.decimals : null;
+            } catch (err) {
+                console.error(`❌ [Redis Client] Failed to get decimals for key ${key}:`, (err as Error).message);
                 return null;
             }
         }
