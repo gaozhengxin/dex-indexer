@@ -14,7 +14,7 @@ async function bootstrap() {
 
     const pgClientInstance = createPgClient(process.env.DATABASE_URL || '');
     const suiClientInstance = createSuiClient(process.env.SUI_RPC_URL || '');
-    const redisClientInstance = createRedisClient(process.env.REDIS_RPC_URL || '');
+    const redisClientInstance = createRedisClient(process.env.REDIS_URL || '');
 
     try {
         await pgClientInstance.connect();
