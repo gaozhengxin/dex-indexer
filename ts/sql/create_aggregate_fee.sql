@@ -19,3 +19,6 @@ ON public.cetus_swap_daily_summary (pool, date);
 
 ALTER TABLE public.cetus_swap_daily_summary
 ADD COLUMN total_usd numeric NOT NULL DEFAULT 0;
+
+ALTER TABLE public.cetus_swap_daily_summary
+ADD COLUMN total_fee_usd numeric NOT NULL DEFAULT 0;

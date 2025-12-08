@@ -65,28 +65,40 @@ export function createAggregateService(
         amountBIn: number,
         amountAOut: number,
         amountBOut: number,
+        totalFeeA: number,
+        totalFeeB: number,
         ts: number
-    ): Promise<number> {
+    ): Promise<{ usdValue: number; totalFeeUsd: number }> {
         // 获取价格
         const priceA = await getNearestPrice(poolTypes.typeA, ts);
         const priceB = await getNearestPrice(poolTypes.typeB, ts);
 
+        // 获取 decimals，必须存在，否则 panic
         const decimalsA = priceGetter.getCoinDecimals
             ? await priceGetter.getCoinDecimals(poolTypes.typeA)
-            : 0;
+            : (() => { throw new Error(`Missing decimals for ${poolTypes.typeA}`) })();
         const decimalsB = priceGetter.getCoinDecimals
             ? await priceGetter.getCoinDecimals(poolTypes.typeB)
-            : 0;
+            : (() => { throw new Error(`Missing decimals for ${poolTypes.typeB}`) })();
 
+        // 计算交易额 USD
         const inValue = new Decimal(priceA!).mul(amountAIn).div(new Decimal(10).pow(decimalsA!))
             .add(new Decimal(priceB!).mul(amountBIn).div(new Decimal(10).pow(decimalsB!)));
 
         const outValue = new Decimal(priceA!).mul(amountAOut).div(new Decimal(10).pow(decimalsA!))
             .add(new Decimal(priceB!).mul(amountBOut).div(new Decimal(10).pow(decimalsB!)));
 
-        return inValue.gt(0) ? inValue.toNumber() : outValue.toNumber();
-    }
+        const usdValue = inValue.gt(0) ? inValue : outValue;
 
+        // 计算手续费 USD
+        const totalFeeUsd = new Decimal(priceA!).mul(totalFeeA).div(new Decimal(10).pow(decimalsA!))
+            .add(new Decimal(priceB!).mul(totalFeeB).div(new Decimal(10).pow(decimalsB!)));
+
+        return {
+            usdValue: usdValue.toNumber(),
+            totalFeeUsd: totalFeeUsd.toNumber()
+        };
+    }
 
     return {
         async runDailyAggregationJob(): Promise<AggregateResult> {
@@ -144,6 +156,7 @@ export function createAggregateService(
                         totalBIn: number;
                         totalBOut: number;
                         totalUsd: number;
+                        totalFeeUsd: number;
                         swapCount: number;
                         totalFeeA: number;
                         totalFeeB: number;
@@ -163,12 +176,13 @@ export function createAggregateService(
                             const feeB = Number(row.fee_amount_b) || 0;
                             const ts = Number(row.timestamp);
 
-                            const usdValue = await computeUsdValueForSwap(poolInfo, amountAIn, amountBIn, amountAOut, amountBOut, ts);
+                            const { usdValue, totalFeeUsd } = await computeUsdValueForSwap(poolInfo, amountAIn, amountBIn, amountAOut, amountBOut, feeA, feeB, ts);
 
                             const prev = batchAgg.get(poolId) || {
                                 totalAIn: 0, totalAOut: 0,
                                 totalBIn: 0, totalBOut: 0,
-                                totalUsd: 0, swapCount: 0,
+                                totalUsd: 0, totalFeeUsd: 0,
+                                swapCount: 0,
                                 totalFeeA: 0, totalFeeB: 0
                             };
 
@@ -177,6 +191,7 @@ export function createAggregateService(
                             prev.totalBIn += amountBIn;
                             prev.totalBOut += amountBOut;
                             prev.totalUsd += usdValue;
+                            prev.totalFeeUsd += totalFeeUsd;
                             prev.swapCount += 1;
                             prev.totalFeeA += feeA;
                             prev.totalFeeB += feeB;
@@ -194,7 +209,7 @@ INSERT INTO public.cetus_swap_daily_summary
     (pool, date,
      total_a_in, total_a_out,
      total_b_in, total_b_out,
-     total_usd,
+     total_usd, total_fee_usd,
      total_fee_a, total_fee_b)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 ON CONFLICT (pool, date) DO UPDATE SET
@@ -203,6 +218,7 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_b_in  = EXCLUDED.total_b_in,
     total_b_out = EXCLUDED.total_b_out,
     total_usd   = EXCLUDED.total_usd,
+    total_fee_usd = EXCLUDED.total_fee_usd,
     total_fee_a = EXCLUDED.total_fee_a,
     total_fee_b = EXCLUDED.total_fee_b
 `;
@@ -210,7 +226,7 @@ ON CONFLICT (pool, date) DO UPDATE SET
                                 poolId, summaryDate,
                                 v.totalAIn, v.totalAOut,
                                 v.totalBIn, v.totalBOut,
-                                v.totalUsd, v.totalFeeA, v.totalFeeB
+                                v.totalUsd, , v.totalFeeUsd, v.totalFeeA, v.totalFeeB
                             ]);
                         } else {
                             const UPSERT_ADD_SQL = `
@@ -218,7 +234,7 @@ INSERT INTO public.cetus_swap_daily_summary
     (pool, date,
      total_a_in, total_a_out,
      total_b_in, total_b_out,
-     total_usd,
+     total_usd, total_fee_usd,
      total_fee_a, total_fee_b)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 ON CONFLICT (pool, date) DO UPDATE SET
@@ -227,6 +243,7 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_b_in  = public.cetus_swap_daily_summary.total_b_in + EXCLUDED.total_b_in,
     total_b_out = public.cetus_swap_daily_summary.total_b_out + EXCLUDED.total_b_out,
     total_usd   = public.cetus_swap_daily_summary.total_usd + EXCLUDED.total_usd,
+    total_fee_usd = public.cetus_swap_daily_summary.total_fee_usd + EXCLUDED.total_fee_usd,
     total_fee_a = public.cetus_swap_daily_summary.total_fee_a + EXCLUDED.total_fee_a,
     total_fee_b = public.cetus_swap_daily_summary.total_fee_b + EXCLUDED.total_fee_b
 `;
@@ -234,7 +251,7 @@ ON CONFLICT (pool, date) DO UPDATE SET
                                 poolId, summaryDate,
                                 v.totalAIn, v.totalAOut,
                                 v.totalBIn, v.totalBOut,
-                                v.totalUsd, v.totalFeeA, v.totalFeeB
+                                v.totalUsd, v.totalFeeUsd, v.totalFeeA, v.totalFeeB
                             ]);
                         }
                     }
