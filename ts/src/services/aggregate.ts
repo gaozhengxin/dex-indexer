@@ -162,11 +162,11 @@ export function createAggregateService(
                         if (isFirstBatch) {
                             const UPSERT_REPLACE_SQL = `
                                 INSERT INTO public.cetus_swap_daily_summary
-                                    (pool, date, total_amount_in, total_amount_out, total_usd, swap_count, total_fee_a, total_fee_b)
+                                    (pool, date, total_in, total_out, total_usd, swap_count, total_fee_a, total_fee_b)
                                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
                                 ON CONFLICT (pool, date) DO UPDATE SET
-                                    total_amount_in  = EXCLUDED.total_amount_in,
-                                    total_amount_out = EXCLUDED.total_amount_out,
+                                    total_in  = EXCLUDED.total_in,
+                                    total_out = EXCLUDED.total_out,
                                     total_usd        = EXCLUDED.total_usd,
                                     swap_count       = EXCLUDED.swap_count,
                                     total_fee_a      = EXCLUDED.total_fee_a,
@@ -176,11 +176,11 @@ export function createAggregateService(
                         } else {
                             const UPSERT_ADD_SQL = `
                                 INSERT INTO public.cetus_swap_daily_summary
-                                    (pool, date, total_amount_in, total_amount_out, total_usd, swap_count, total_fee_a, total_fee_b)
+                                    (pool, date, total_in, total_out, total_usd, swap_count, total_fee_a, total_fee_b)
                                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
                                 ON CONFLICT (pool, date) DO UPDATE SET
-                                    total_amount_in  = public.cetus_swap_daily_summary.total_amount_in + EXCLUDED.total_amount_in,
-                                    total_amount_out = public.cetus_swap_daily_summary.total_amount_out + EXCLUDED.total_amount_out,
+                                    total_in  = public.cetus_swap_daily_summary.total_in + EXCLUDED.total_in,
+                                    total_out = public.cetus_swap_daily_summary.total_out + EXCLUDED.total_out,
                                     total_usd        = public.cetus_swap_daily_summary.total_usd + EXCLUDED.total_usd,
                                     swap_count       = public.cetus_swap_daily_summary.swap_count + EXCLUDED.swap_count,
                                     total_fee_a      = public.cetus_swap_daily_summary.total_fee_a + EXCLUDED.total_fee_a,
