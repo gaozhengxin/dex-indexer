@@ -16,7 +16,11 @@ export interface LiquidityService {
     runLiquiditySnapshot: () => Promise<void>;
 }
 
-export function createLiquidityService(dbClient: PgClient, suiClient: SuiRpcClient, priceGetter: HistoricalPriceGetter): LiquidityService {
+export function createLiquidityService(
+    dbClient: PgClient,
+    suiClient: SuiRpcClient,
+    priceGetter: HistoricalPriceGetter
+): LiquidityService {
 
     async function getNearestPrice(tokenType: string, ts: number): Promise<number | null> {
         const t0 = ts - (ts % 60);
@@ -76,47 +80,51 @@ export function createLiquidityService(dbClient: PgClient, suiClient: SuiRpcClie
 
                 if (poolIds.length === 0) return;
 
-                const objectResponses = await suiClient.multiGetObjects({
-                    ids: poolIds,
-                    options: { showContent: true, showType: true }
-                });
+                const BATCH_LIMIT = 50; // Sui RPC multiGetObjects 限制
+                for (let i = 0; i < poolIds.length; i += BATCH_LIMIT) {
+                    const batchIds = poolIds.slice(i, i + BATCH_LIMIT);
 
-                for (const response of objectResponses) {
-                    if (response.error || !response.data || !response.data.content) {
-                        console.warn(`Skipping pool (Error/No Content): ${response.error?.code || response.data?.objectId}`);
-                        continue;
+                    const objectResponses = await suiClient.multiGetObjects({
+                        ids: batchIds,
+                        options: { showContent: true, showType: true }
+                    });
+
+                    for (const response of objectResponses) {
+                        if (response.error || !response.data || !response.data.content) {
+                            console.warn(`Skipping pool (Error/No Content): ${response.error?.code || response.data?.objectId}`);
+                            continue;
+                        }
+
+                        const fields = (response.data.content as any).fields;
+                        const objectType = response.data.type || '';
+                        if (!fields || !objectType.includes('::pool::Pool<')) {
+                            console.warn(`Skipping object ${response.data.objectId}: Not a Pool object.`);
+                            continue;
+                        }
+
+                        const [typeA, typeB] = parsePoolTypes(objectType);
+                        const amountA = parseFloat(fields.coin_a);
+                        const amountB = parseFloat(fields.coin_b);
+
+                        const priceA = await getNearestPrice(typeA, currentTimestamp);
+                        const priceB = await getNearestPrice(typeB, currentTimestamp);
+
+                        const tvl =
+                            (priceA ? priceA * amountA : 0) +
+                            (priceB ? priceB * amountB : 0);
+
+                        const record = {
+                            pool: response.data.objectId,
+                            amount_a: amountA,
+                            amount_b: amountB,
+                            type_a: typeA,
+                            type_b: typeB,
+                            timestamp: currentTimestamp,
+                            tvl
+                        };
+
+                        await saveSnapshot(record);
                     }
-
-                    const fields = (response.data.content as any).fields;
-                    const objectType = response.data.type || '';
-                    if (!fields || !objectType.includes('::pool::Pool<')) {
-                        console.warn(`Skipping object ${response.data.objectId}: Not a Pool object.`);
-                        continue;
-                    }
-
-                    const [typeA, typeB] = parsePoolTypes(objectType);
-
-                    const amountA = parseFloat(fields.coin_a);
-                    const amountB = parseFloat(fields.coin_b);
-
-                    const priceA = await getNearestPrice(typeA, currentTimestamp);
-                    const priceB = await getNearestPrice(typeB, currentTimestamp);
-
-                    const tvl =
-                        (priceA ? priceA * amountA : 0) +
-                        (priceB ? priceB * amountB : 0);
-
-                    const record = {
-                        pool: response.data.objectId,
-                        amount_a: amountA,
-                        amount_b: amountB,
-                        type_a: typeA,
-                        type_b: typeB,
-                        timestamp: currentTimestamp,
-                        tvl
-                    };
-
-                    await saveSnapshot(record);
                 }
 
                 const duration = Date.now() - startTime;
