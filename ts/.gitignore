@@ -1,0 +1,25 @@
+/node_modules
+/dist
+/build
+/out
+*.tsbuildinfo
+*.d.ts.map
+.cache/
+/coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+/logs
+*.tgz
+.vscode/  # 除非你希望共享 VS Code 工作区设置
+.idea/    # IntelliJ/WebStorm/RustRover
+*.sublime-workspace
+.DS_Store
+.AppleDouble
+Thumbs.db
+pm2.log
+pm2.pid
+ecosystem.config.js.bak
+.env
+.env.local
