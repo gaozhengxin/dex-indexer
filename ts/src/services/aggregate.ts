@@ -161,12 +161,12 @@ export function createAggregateService(
                     for (const [poolId, v] of batchAgg.entries()) {
                         if (isFirstBatch) {
                             const UPSERT_REPLACE_SQL = `
-                                INSERT INTO public.cetus_swap_daily_summary
-(pool, date,
- total_a_in, total_a_out,
- total_b_in, total_b_out,
- total_usd,
- total_fee_a, total_fee_b)
+INSERT INTO public.cetus_swap_daily_summary
+    (pool, date,
+     total_a_in, total_a_out,
+     total_b_in, total_b_out,
+     total_usd,
+     total_fee_a, total_fee_b)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 ON CONFLICT (pool, date) DO UPDATE SET
     total_a_in  = EXCLUDED.total_a_in,
@@ -175,18 +175,17 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_b_out = EXCLUDED.total_b_out,
     total_usd   = EXCLUDED.total_usd,
     total_fee_a = EXCLUDED.total_fee_a,
-    total_fee_b = EXCLUDED.total_fee_b;
-
-                            `;
+    total_fee_b = EXCLUDED.total_fee_b
+`;
                             await dbClient.query(UPSERT_REPLACE_SQL, [poolId, summaryDate, v.totalIn, v.totalOut, v.totalUsd, v.swapCount, v.totalFeeA, v.totalFeeB]);
                         } else {
-                            const UPSERT_ADD_SQL = `
+const UPSERT_ADD_SQL = `
 INSERT INTO public.cetus_swap_daily_summary
-(pool, date,
- total_a_in, total_a_out,
- total_b_in, total_b_out,
- total_usd,
- total_fee_a, total_fee_b)
+    (pool, date,
+     total_a_in, total_a_out,
+     total_b_in, total_b_out,
+     total_usd,
+     total_fee_a, total_fee_b)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 ON CONFLICT (pool, date) DO UPDATE SET
     total_a_in  = public.cetus_swap_daily_summary.total_a_in + EXCLUDED.total_a_in,
@@ -195,9 +194,8 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_b_out = public.cetus_swap_daily_summary.total_b_out + EXCLUDED.total_b_out,
     total_usd   = public.cetus_swap_daily_summary.total_usd + EXCLUDED.total_usd,
     total_fee_a = public.cetus_swap_daily_summary.total_fee_a + EXCLUDED.total_fee_a,
-    total_fee_b = public.cetus_swap_daily_summary.total_fee_b + EXCLUDED.total_fee_b;
-
-                            `;
+    total_fee_b = public.cetus_swap_daily_summary.total_fee_b + EXCLUDED.total_fee_b
+`;
                             await dbClient.query(UPSERT_ADD_SQL, [poolId, summaryDate, v.totalIn, v.totalOut, v.totalUsd, v.swapCount, v.totalFeeA, v.totalFeeB]);
                         }
                     }
