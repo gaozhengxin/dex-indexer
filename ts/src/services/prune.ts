@@ -8,7 +8,7 @@ import { SuiRpcClient } from '../sui/sui.client';
 // 48小时 = 172800 秒
 const PRUNE_SWAP_AND_SNAPSHOTS_SQL = `
     DELETE FROM public.cetus_swap WHERE "timestamp" < (EXTRACT(EPOCH FROM NOW()) - 172800);
-    DELETE FROM public.pool_liquidity_snapshot WHERE "timestamp" < (EXTRACT(EPOCH FROM NOW()) - 172800);
+    DELETE FROM public.cetus_liquidity_snapshot WHERE "timestamp" < (EXTRACT(EPOCH FROM NOW()) - 172800);
 `;
 
 // 2. 删除 cetus_swap_daily_summary 中 date 为 2 天之前的记录

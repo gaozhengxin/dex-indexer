@@ -21,7 +21,7 @@ export function createLiquidityService(dbClient: PgClient, suiClient: SuiRpcClie
     
     async function saveSnapshot(record: LiquiditySnapshotRecord) {
         const sql = `
-            INSERT INTO public.pool_liquidity_snapshot (pool, amount_a, amount_b, type_a, type_b, "timestamp")
+            INSERT INTO public.cetus_liquidity_snapshot (pool, amount_a, amount_b, type_a, type_b, "timestamp")
             VALUES ($1, $2, $3, $4, $5, $6)
         `;
         try {
