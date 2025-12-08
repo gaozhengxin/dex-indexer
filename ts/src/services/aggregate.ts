@@ -82,10 +82,10 @@ export function createAggregateService(
             const poolTypeList: PoolTypeEntry[] = [];
             try {
                 const GET_POOLS_SQL = `
-                    SELECT DISTINCT pool
-                    FROM public.cetus_swap
-                    WHERE "timestamp" >= $1 AND "timestamp" <= $2
-                `;
+            SELECT DISTINCT pool
+            FROM public.cetus_swap
+            WHERE "timestamp" >= $1 AND "timestamp" <= $2
+        `;
                 const poolsRes = await dbClient.query(GET_POOLS_SQL, [startTs, endTs]);
                 const pools: string[] = poolsRes.rows.map((r: any) => r.pool);
 
@@ -112,20 +112,22 @@ export function createAggregateService(
 
                 while (true) {
                     const FETCH_SWAPS_SQL = `
-                        SELECT pool, amount_a_in, amount_b_in, amount_a_out, amount_b_out,
-                               fee_amount_a, fee_amount_b, "timestamp"
-                        FROM public.cetus_swap
-                        WHERE "timestamp" >= $1 AND "timestamp" <= $2
-                        ORDER BY "timestamp" ASC
-                        LIMIT $3 OFFSET $4
-                    `;
+                SELECT pool, amount_a_in, amount_b_in, amount_a_out, amount_b_out,
+                       fee_amount_a, fee_amount_b, "timestamp"
+                FROM public.cetus_swap
+                WHERE "timestamp" >= $1 AND "timestamp" <= $2
+                ORDER BY "timestamp" ASC
+                LIMIT $3 OFFSET $4
+            `;
                     const swapsRes = await dbClient.query(FETCH_SWAPS_SQL, [startTs, endTs, batchSize, offset]);
                     const swaps = swapsRes.rows;
                     if (!swaps || swaps.length === 0) break;
 
                     const batchAgg = new Map<string, {
-                        totalIn: number;
-                        totalOut: number;
+                        totalAIn: number;
+                        totalAOut: number;
+                        totalBIn: number;
+                        totalBOut: number;
                         totalUsd: number;
                         swapCount: number;
                         totalFeeA: number;
@@ -136,6 +138,7 @@ export function createAggregateService(
                         const poolId = row.pool;
                         const poolInfo = poolTypeMap.get(poolId);
                         if (!poolInfo) continue;
+
                         const amountAIn = Number(row.amount_a_in) || 0;
                         const amountBIn = Number(row.amount_b_in) || 0;
                         const amountAOut = Number(row.amount_a_out) || 0;
@@ -145,16 +148,23 @@ export function createAggregateService(
                         const ts = Number(row.timestamp);
 
                         const usdValue = await computeUsdValueForSwap(poolInfo, amountAIn, amountBIn, amountAOut, amountBOut, ts);
-                        const totalIn = amountAIn + amountBIn;
-                        const totalOut = amountAOut + amountBOut;
 
-                        const prev = batchAgg.get(poolId) || { totalIn: 0, totalOut: 0, totalUsd: 0, swapCount: 0, totalFeeA: 0, totalFeeB: 0 };
-                        prev.totalIn += totalIn;
-                        prev.totalOut += totalOut;
+                        const prev = batchAgg.get(poolId) || {
+                            totalAIn: 0, totalAOut: 0,
+                            totalBIn: 0, totalBOut: 0,
+                            totalUsd: 0, swapCount: 0,
+                            totalFeeA: 0, totalFeeB: 0
+                        };
+
+                        prev.totalAIn += amountAIn;
+                        prev.totalAOut += amountAOut;
+                        prev.totalBIn += amountBIn;
+                        prev.totalBOut += amountBOut;
                         prev.totalUsd += usdValue;
                         prev.swapCount += 1;
                         prev.totalFeeA += feeA;
                         prev.totalFeeB += feeB;
+
                         batchAgg.set(poolId, prev);
                     }
 
@@ -177,9 +187,14 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_fee_a = EXCLUDED.total_fee_a,
     total_fee_b = EXCLUDED.total_fee_b
 `;
-                            await dbClient.query(UPSERT_REPLACE_SQL, [poolId, summaryDate, v.totalIn, v.totalOut, v.totalUsd, v.swapCount, v.totalFeeA, v.totalFeeB]);
+                            await dbClient.query(UPSERT_REPLACE_SQL, [
+                                poolId, summaryDate,
+                                v.totalAIn, v.totalAOut,
+                                v.totalBIn, v.totalBOut,
+                                v.totalUsd, v.totalFeeA, v.totalFeeB
+                            ]);
                         } else {
-const UPSERT_ADD_SQL = `
+                            const UPSERT_ADD_SQL = `
 INSERT INTO public.cetus_swap_daily_summary
     (pool, date,
      total_a_in, total_a_out,
@@ -196,7 +211,12 @@ ON CONFLICT (pool, date) DO UPDATE SET
     total_fee_a = public.cetus_swap_daily_summary.total_fee_a + EXCLUDED.total_fee_a,
     total_fee_b = public.cetus_swap_daily_summary.total_fee_b + EXCLUDED.total_fee_b
 `;
-                            await dbClient.query(UPSERT_ADD_SQL, [poolId, summaryDate, v.totalIn, v.totalOut, v.totalUsd, v.swapCount, v.totalFeeA, v.totalFeeB]);
+                            await dbClient.query(UPSERT_ADD_SQL, [
+                                poolId, summaryDate,
+                                v.totalAIn, v.totalAOut,
+                                v.totalBIn, v.totalBOut,
+                                v.totalUsd, v.totalFeeA, v.totalFeeB
+                            ]);
                         }
                     }
 
@@ -209,5 +229,6 @@ ON CONFLICT (pool, date) DO UPDATE SET
                 return { poolTypeList, startTs, endTs };
             }
         }
+
     };
 }
