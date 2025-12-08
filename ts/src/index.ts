@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { createPgClient } from './pg/pg.client';
 import { createSuiClient } from './sui/sui.client';
+import { createRedisClient } from './redis/redis.client';
 import { createAggregateService, AggregateService } from './services/aggregate';
 import { createLiquidityService, LiquidityService } from './services/liquidity';
 import { createPruneService, PruneService } from './services/prune';
@@ -10,10 +11,11 @@ dotenv.config();
 
 async function bootstrap() {
     console.log("--- Worker Application Startup ---");
-    
+
     const pgClientInstance = createPgClient(process.env.DATABASE_URL || '');
     const suiClientInstance = createSuiClient(process.env.SUI_RPC_URL || '');
-    
+    const redisClientInstance = createRedisClient(process.env.REDIS_RPC_URL || '');
+
     try {
         await pgClientInstance.connect();
     } catch (error) {
@@ -21,10 +23,10 @@ async function bootstrap() {
         throw error;
     }
 
-    const aggregateService: AggregateService = createAggregateService(pgClientInstance);
-    const liquidityService: LiquidityService = createLiquidityService(pgClientInstance, suiClientInstance);
+    const aggregateService: AggregateService = createAggregateService(pgClientInstance, suiClientInstance, redisClientInstance);
+    const liquidityService: LiquidityService = createLiquidityService(pgClientInstance, suiClientInstance, redisClientInstance);
     const pruneService: PruneService = createPruneService(pgClientInstance);
-    
+
     startScheduler(aggregateService, liquidityService, pruneService, suiClientInstance); // 👈 传入 PruneService 
 
     console.log("--- Worker Application Running in background ---");
@@ -32,5 +34,5 @@ async function bootstrap() {
 
 bootstrap().catch(err => {
     console.error("🛑 FATAL ERROR: Application failed to start.", err);
-    process.exit(1); 
+    process.exit(1);
 });

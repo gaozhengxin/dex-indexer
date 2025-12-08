@@ -14,3 +14,6 @@ CREATE TABLE public.cetus_liquidity_snapshot (
 
 CREATE INDEX idx_liquidity_pool_timestamp
 ON public.cetus_liquidity_snapshot (pool, "timestamp");
+
+ALTER TABLE public.cetus_liquidity_snapshot
+ADD COLUMN tvl numeric NOT NULL DEFAULT 0;

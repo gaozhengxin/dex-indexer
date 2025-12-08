@@ -16,3 +16,6 @@ CREATE TABLE public.cetus_swap_daily_summary (
 
 CREATE UNIQUE INDEX idx_cetus_swap_daily_summary_pool_date_unique 
 ON public.cetus_swap_daily_summary (pool, date);
+
+ALTER TABLE public.cetus_swap_daily_summary
+ADD COLUMN total_usd numeric NOT NULL DEFAULT 0;
