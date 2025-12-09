@@ -217,7 +217,7 @@ INSERT INTO public.cetus_swap_daily_summary
      total_b_in, total_b_out,
      total_usd, total_fee_usd,
      total_fee_a, total_fee_b)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 ON CONFLICT (pool, date) DO UPDATE SET
     total_a_in  = EXCLUDED.total_a_in,
     total_a_out = EXCLUDED.total_a_out,
@@ -243,7 +243,7 @@ INSERT INTO public.cetus_swap_daily_summary
      total_b_in, total_b_out,
      total_usd, total_fee_usd,
      total_fee_a, total_fee_b)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 ON CONFLICT (pool, date) DO UPDATE SET
     total_a_in  = public.cetus_swap_daily_summary.total_a_in + EXCLUDED.total_a_in,
     total_a_out = public.cetus_swap_daily_summary.total_a_out + EXCLUDED.total_a_out,
