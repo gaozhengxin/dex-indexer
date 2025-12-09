@@ -115,6 +115,7 @@ export function createAggregateService(
         `;
                 const poolsRes = await dbClient.query(GET_POOLS_SQL, [startTs, endTs]);
                 const pools: string[] = poolsRes.rows.map((r: any) => r.pool);
+                console.log(`[Aggregate service] found ${pools.length} pools`);
 
                 for (const poolId of pools) {
                     try {
@@ -125,8 +126,11 @@ export function createAggregateService(
                         if (!resp || resp.error || !resp.data || !resp.data.type) continue;
                         const [typeA, typeB] = parsePoolTypes(resp.data.type as string);
                         poolTypeList.push({ pool: poolId, typeA, typeB });
-                    } catch { }
-                    await sleep(200);
+                    } catch {
+                        //
+                    } finally {
+                        await sleep(200);
+                    }
                 }
 
                 const poolTypeMap = new Map<string, { typeA: string; typeB: string }>();
@@ -138,6 +142,7 @@ export function createAggregateService(
                 const summaryDate = new Date(endTs * 1000).toISOString().slice(0, 10);
 
                 while (true) {
+                    console.log(`fetch swap: ${offset}`);
                     const FETCH_SWAPS_SQL = `
                 SELECT pool, amount_a_in, amount_b_in, amount_a_out, amount_b_out,
                        fee_amount_a, fee_amount_b, "timestamp"
@@ -204,6 +209,7 @@ export function createAggregateService(
 
                     for (const [poolId, v] of batchAgg.entries()) {
                         if (isFirstBatch) {
+                            console.log(`[Aggregate service] insert daily summary: ${poolId}`);
                             const UPSERT_REPLACE_SQL = `
 INSERT INTO public.cetus_swap_daily_summary
     (pool, date,
@@ -229,6 +235,7 @@ ON CONFLICT (pool, date) DO UPDATE SET
                                 v.totalUsd, , v.totalFeeUsd, v.totalFeeA, v.totalFeeB
                             ]);
                         } else {
+                            console.log(`[Aggregate service] update daily summary: ${poolId}`);
                             const UPSERT_ADD_SQL = `
 INSERT INTO public.cetus_swap_daily_summary
     (pool, date,
