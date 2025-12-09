@@ -30,8 +30,8 @@ function parsePoolTypes(typeString: string): [string, string] {
     return ['', ''];
 }
 
-function alignToMinute(ts: number): number {
-    return ts - (ts % 60);
+function alignToHour(ts: number): number {
+    return ts - (ts % 3600);
 }
 
 export function createAggregateService(
@@ -41,7 +41,7 @@ export function createAggregateService(
 ): AggregateService {
 
     async function getNearestPrice(tokenType: string, swapTs: number): Promise<number | null> {
-        const t0 = alignToMinute(swapTs);
+        const t0 = alignToHour(swapTs);
         const t1 = t0 + 60;
         try {
             const [v0Raw, v1Raw] = await Promise.all([
