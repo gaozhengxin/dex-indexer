@@ -232,7 +232,8 @@ ON CONFLICT (pool, date) DO UPDATE SET
                                 poolId, summaryDate,
                                 v.totalAIn, v.totalAOut,
                                 v.totalBIn, v.totalBOut,
-                                v.totalUsd, , v.totalFeeUsd, v.totalFeeA, v.totalFeeB
+                                v.totalUsd, v.totalFeeUsd,
+                                v.totalFeeA, v.totalFeeB
                             ]);
                         } else {
                             console.log(`[Aggregate service] update daily summary: ${poolId}`);
@@ -258,7 +259,8 @@ ON CONFLICT (pool, date) DO UPDATE SET
                                 poolId, summaryDate,
                                 v.totalAIn, v.totalAOut,
                                 v.totalBIn, v.totalBOut,
-                                v.totalUsd, v.totalFeeUsd, v.totalFeeA, v.totalFeeB
+                                v.totalUsd, v.totalFeeUsd,
+                                v.totalFeeA, v.totalFeeB
                             ]);
                         }
                     }
@@ -272,6 +274,5 @@ ON CONFLICT (pool, date) DO UPDATE SET
                 return { poolTypeList, startTs, endTs };
             }
         }
-
     };
 }
